@@ -1,0 +1,82 @@
+import numpy as np
+import pandas as pd
+
+def calculate_lifted_index(temp_surface, temp_parcel, pressure_levels):
+    """
+    Calculate the lifted index (LI), an indicator of atmospheric stability.
+    A negative LI indicates instability and potential for precipitation enhancement.
+    
+    Parameters:
+    temp_surface: float - Surface temperature (K).
+    temp_parcel: np.array - Parcel temperatures at different pressure levels (K).
+    pressure_levels: np.array - Atmospheric pressure levels (hPa).
+
+    Returns:
+    float - Lifted Index (LI).
+
+    Calculation of the Lifted Index (LI), a measure of atmospheric stability, 
+    which compares the temperature of a rising air parcel to the surrounding environment at 500 hPa.
+    A negative LI indicates that the atmosphere is unstable, suggesting an increased likelihood of precipitation.
+    """
+    # Identify the temperature of the environment at 500 hPa
+    env_temp_500 = temp_parcel[np.where(pressure_levels == 500)[0]]
+
+    if env_temp_500.size > 0:
+        li = env_temp_500[0] - temp_surface
+        print("Li:", li)
+        return li
+    else:
+        raise ValueError("500 hPa level not found in the data.")
+
+def calculate_cloud_water_potential(cloud_water_content):
+    """
+    Normalize the cloud water content to assess precipitation enhancement potential.
+    
+    Parameters:
+    cloud_water_content: float - Total cloud water content (g/kg).
+
+    Returns:
+    float - Scaled cloud water potential (0-1).
+    """
+    max_cwc = 5.0  # Assume a maximum realistic value for normalization
+    return min(cloud_water_content / max_cwc, 1.0)
+
+def estimate_precipitation_potential(temp_surface, temp_parcel, pressure_levels, cloud_water_content):
+    """
+    Estimate the potential for precipitation enhancement.
+
+    Parameters:
+    temp_surface: float - Surface temperature (K).
+    temp_parcel: np.array - Parcel temperatures at different pressure levels (K).
+    pressure_levels: np.array - Atmospheric pressure levels (hPa).
+    cloud_water_content: float - Cloud water content (g/kg).
+
+    Returns:
+    float - Precipitation potential score (0-1).
+    """
+    # Calculate lifted index
+    try:
+        li = calculate_lifted_index(temp_surface, temp_parcel, pressure_levels)
+    except ValueError as e:
+        print("Error calculating lifted index:", e)
+        return 0.0
+
+    # Calculate atmospheric instability potential (negative LI is favorable)
+    instability_potential = max(-li / 10.0, 0.0)  # Normalize to a 0-1 scale
+
+    # Calculate cloud water potential
+    cloud_potential = calculate_cloud_water_potential(cloud_water_content)
+    
+    # Combine factors into a final precipitation potential score
+    precipitation_potential = 0.6 * instability_potential + 0.4 * cloud_potential
+    return min(precipitation_potential, 1.0)
+
+# Example data
+temp_surface = 303.15  # Surface temperature in K
+temp_parcel = np.array([303.15, 298.15, 293.15, 283.15])  # Parcel temperature at various levels (K)
+pressure_levels = np.array([1000, 850, 700, 500])  # Pressure levels in hPa
+cloud_water_content = 2.5  # Cloud water content in g/kg
+
+# Estimate precipitation potential
+potential_score = estimate_precipitation_potential(temp_surface, temp_parcel, pressure_levels, cloud_water_content)
+print(f"Estimated precipitation enhancement potential: {potential_score:.2f}")
